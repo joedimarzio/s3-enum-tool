@@ -246,7 +246,7 @@ func CheckDomainPermutations(cfg *cmd.Config) {
         }
 
         func(pd PermutatedDomain) {  //go
-            time.Sleep(500 * time.Millisecond)
+            time.Sleep(200 * time.Millisecond)
             req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
 
             if err != nil {
@@ -372,7 +372,7 @@ func CheckKeywordPermutations(cfg *cmd.Config) {
         }
 
         func(pd Keyword) { //go
-            time.Sleep(500 * time.Millisecond)
+            time.Sleep(200 * time.Millisecond) //500
             req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
 
             if err != nil {

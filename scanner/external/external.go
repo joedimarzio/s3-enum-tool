@@ -245,9 +245,9 @@ func CheckDomainPermutations(cfg *cmd.Config) {
             log.Error(err)
         }
 
-        go func(pd PermutatedDomain) {
+        func(pd PermutatedDomain) {  //go
             time.Sleep(500 * time.Millisecond)
-            req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com/favicon.ico", nil)
+            req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
 
             if err != nil {
                 if !strings.Contains(err.Error(), "time") {
@@ -315,13 +315,13 @@ func CheckDomainPermutations(cfg *cmd.Config) {
                     cfg.Stats.IncRequests200()
                     cfg.Stats.Add200Link(loc)
                 } else if resp.StatusCode == 403 {
-                    log.Infof("\033[31m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
+                    log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
                     fo.Write([]byte("FORBIDDEN: " + pd.Permutation + "\r"))
                     cfg.Stats.IncRequests403()
                     cfg.Stats.Add403Link(pd.Permutation)
                 }
             } else if resp.StatusCode == 403 {
-                log.Infof("\033[31m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
+                log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
                 fo.Write([]byte("FORBIDDEN: " + pd.Permutation + "\r"))
                 cfg.Stats.IncRequests403()
                 cfg.Stats.Add403Link(pd.Permutation)
@@ -330,7 +330,7 @@ func CheckDomainPermutations(cfg *cmd.Config) {
                 cfg.Stats.IncRequests404()
                 cfg.Stats.Add404Link(pd.Permutation)
             } else if resp.StatusCode == 503 {
-                log.Infof("\033[31m\033[1mTOO FAST\033[39m\033[0m (added to queue to process later)")
+                log.Infof("\033[34m\033[1mTOO FAST\033[39m\033[0m (added to queue to process later)")
                 permutatedQ.Put(pd)
                 cfg.Stats.IncRequests503()
                 cfg.Stats.Add503Link(pd.Permutation)
@@ -359,7 +359,7 @@ func CheckKeywordPermutations(cfg *cmd.Config) {
             panic(err)
         }
     }()
-    
+
     var max = cfg.Concurrency
     sem = make(chan int, max)
 
@@ -371,9 +371,9 @@ func CheckKeywordPermutations(cfg *cmd.Config) {
             log.Error(err)
         }
 
-        go func(pd Keyword) {
+        func(pd Keyword) { //go
             time.Sleep(500 * time.Millisecond)
-            req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com/favicon.ico", nil)
+            req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
 
             if err != nil {
                 if !strings.Contains(err.Error(), "time") {
@@ -443,13 +443,13 @@ func CheckKeywordPermutations(cfg *cmd.Config) {
                     cfg.Stats.IncRequests200()
                     cfg.Stats.Add200Link(loc)
                 } else if resp.StatusCode == 403 {
-                    log.Infof("\033[31m\033[1mFORBIDDEN\033[39m\033[0m %s (\033[33m%s\033[39m)", loc, pd.Keyword)
+                    log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m %s (\033[33m%s\033[39m)", loc, pd.Keyword)
                     fo.Write([]byte("FORBIDDEN: " + pd.Permutation + "\r"))
                     cfg.Stats.IncRequests403()
                     cfg.Stats.Add403Link(loc)
                 }
             } else if resp.StatusCode == 403 {
-                log.Infof("\033[31m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33m%s\033[39m)", pd.Permutation, pd.Keyword)
+                log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33m%s\033[39m)", pd.Permutation, pd.Keyword)
                 fo.Write([]byte("FORBIDDEN: " + pd.Permutation + "\r"))
                 cfg.Stats.IncRequests403()
                 cfg.Stats.Add403Link(pd.Permutation)
@@ -458,7 +458,7 @@ func CheckKeywordPermutations(cfg *cmd.Config) {
                 cfg.Stats.IncRequests404()
                 cfg.Stats.Add404Link(pd.Permutation)
             } else if resp.StatusCode == 503 {
-                log.Infof("\033[31m\033[1mTOO FAST\033[39m\033[0m (added to queue to process later)")
+                log.Infof("\033[34m\033[1mTOO FAST\033[39m\033[0m (added to queue to process later)")
                 permutatedQ.Put(pd)
                 cfg.Stats.IncRequests503()
                 cfg.Stats.Add503Link(pd.Permutation)

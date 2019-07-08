@@ -58,6 +58,7 @@ type Config struct {
 
 func setFlags() {
     domainCmd.PersistentFlags().StringSliceVarP(&cfgDomains, "target", "t", []string{}, "Domains to enumerate s3 buckets; format: example1.com,example2.com,example3.com")
+    //domainCmd.PersistentFlags().BoolVarP(&cfgVerbose, "verbose", "v", false, "Verbose output")
     domainCmd.PersistentFlags().StringVarP(&cfgPermutationsFile, "permutations", "p", "./permutations.json", "Permutations file location")
     domainCmd.PersistentFlags().BoolVarP(&cfgDebug, "debug", "d", false, "Debug output")
     domainCmd.PersistentFlags().IntVarP(&cfgConcurrency, "concurrency", "c", 0, "Connection concurrency; default is the system CPU count")

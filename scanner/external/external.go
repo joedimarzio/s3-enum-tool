@@ -219,20 +219,15 @@ func PermutateKeywordRunner(cfg *cmd.Config) {
 
 // CheckDomainPermutations runs through all permutations checking them for PUBLIC/FORBIDDEN buckets
 func CheckDomainPermutations(cfg *cmd.Config) {
-    // open output file
     fo, err := os.Create("output.txt")
     if err != nil {
         panic(err)
     }
-    // close fo on exit and check for its returned error
     defer func() {
         if err := fo.Close(); err != nil {
             panic(err)
         }
     }()
-     ///////^^^^^^all new
-
-
 
     var max = cfg.Concurrency
     sem = make(chan int, max)
@@ -245,8 +240,8 @@ func CheckDomainPermutations(cfg *cmd.Config) {
             log.Error(err)
         }
 
-        func(pd PermutatedDomain) {  //go
-            time.Sleep(200 * time.Millisecond)
+        func(pd PermutatedDomain) {
+            time.Sleep(100 * time.Millisecond) //500
             req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
 
             if err != nil {
@@ -326,7 +321,7 @@ func CheckDomainPermutations(cfg *cmd.Config) {
                 cfg.Stats.IncRequests403()
                 cfg.Stats.Add403Link(pd.Permutation)
             } else if resp.StatusCode == 404 {
-                log.Infof("\033[31m\033[1mNOT FOUND\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
+                log.Debugf("\033[31m\033[1mNOT FOUND\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
                 cfg.Stats.IncRequests404()
                 cfg.Stats.Add404Link(pd.Permutation)
             } else if resp.StatusCode == 503 {
@@ -371,8 +366,8 @@ func CheckKeywordPermutations(cfg *cmd.Config) {
             log.Error(err)
         }
 
-        func(pd Keyword) { //go
-            time.Sleep(200 * time.Millisecond) //500
+        func(pd Keyword) { //put go back in
+            time.Sleep(100 * time.Millisecond) //500
             req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
 
             if err != nil {
@@ -405,7 +400,6 @@ func CheckKeywordPermutations(cfg *cmd.Config) {
             io.Copy(ioutil.Discard, resp.Body)
             defer resp.Body.Close()
 
-            //log.Infof("%s (%d)", host, resp.StatusCode)
             if resp.StatusCode == 200 {
                 log.Infof("\033[32m\033[1mPUBLIC\033[39m\033[0m http://%s (\033[33m%s\033[39m)", pd.Permutation, pd.Keyword)
                 fo.Write([]byte("PUBLIC: " + pd.Permutation + "\r"))
@@ -454,7 +448,7 @@ func CheckKeywordPermutations(cfg *cmd.Config) {
                 cfg.Stats.IncRequests403()
                 cfg.Stats.Add403Link(pd.Permutation)
             } else if resp.StatusCode == 404 {
-                log.Infof("\033[31m\033[1mNOT FOUND\033[39m\033[0m http://%s (\033[33m%s\033[39m)", pd.Permutation, pd.Keyword)
+                log.Debugf("\033[31m\033[1mNOT FOUND\033[39m\033[0m http://%s (\033[33m%s\033[39m)", pd.Permutation, pd.Keyword)
                 cfg.Stats.IncRequests404()
                 cfg.Stats.Add404Link(pd.Permutation)
             } else if resp.StatusCode == 503 {

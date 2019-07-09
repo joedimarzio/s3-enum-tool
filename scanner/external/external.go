@@ -63,7 +63,10 @@ func BucketExists(config aws.Config, bucket string) {
             case "AccessDenied":
                 fo.Write([]byte("Bucket exists: " + bucket + "\r"))
                 existingBucketsYo.Put(bucket)
+            case "NoSuchBucket":
+                
             default:
+                log.Infof(aerr.Error())
             }
         }
     } else {
@@ -84,34 +87,17 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
         panic(errorr)
     }
     
-    var max = 16  //8 seems best so far
+    var max = cfg.Concurrency //16  //8 seems best so far
     sem = make(chan int, max)
 
     for bucket := range buckets {
         sem <- 1
         log.Infof(buckets[bucket])
-        go BucketExists(config, buckets[bucket]) //go
+        go BucketExists(config, buckets[bucket])
 
     }
 
-    time.Sleep(1000 * time.Millisecond) //500 ///
-
-    //bucket, err := existingBucketsYo.Get(1)
-    //if (err != nil) {}
-    //log.Infof("BUCKET: " + bucket[0].(string))
-
-    /*
-    for {
-        log.Infof("loop")
-        bucket, err := existingBucketsYo.Get(1)
-        if (err != nil) {}
-        log.Infof("Existing bucket named: " + bucket[0].(string))
-
-        if (existingBucketsYo.Len() == 0) {
-            break
-        }
-    }
-    */
+    time.Sleep(1000 * time.Millisecond)
 
     
     for {
@@ -187,118 +173,6 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
         }
     }
 }
-
-
-    /*
-    for {
-        sem <- 1
-        dom, err := permutatedQ.Get(1)
-
-        if err != nil {
-            log.Error(err)
-        }
-
-        func(pd PermutatedDomain) {
-            time.Sleep(200 * time.Millisecond) //500
-            req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
-
-            if err != nil {
-                if !strings.Contains(err.Error(), "time") {
-                    log.Error(err)
-                }
-
-                permutatedQ.Put(pd)
-                <-sem
-                return
-            }
-
-            req.Host = pd.Permutation
-
-            resp, err1 := kclient.Do(req)
-
-            if err1 != nil {
-                if strings.Contains(err1.Error(), "time") {
-                    permutatedQ.Put(pd)
-                    <-sem
-                    return
-                }
-
-                log.Error(err1)
-                permutatedQ.Put(pd)
-                <-sem
-                return
-            }
-            io.Copy(ioutil.Discard, resp.Body)
-            defer resp.Body.Close()
-
-            if resp.StatusCode == 200 {
-                log.Infof("\033[32m\033[1mPUBLIC\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
-                fo.Write([]byte("PUBLIC: " + pd.Permutation + "\r"))
-                cfg.Stats.IncRequests200()
-                cfg.Stats.Add200Link(pd.Permutation)
-            } else if resp.StatusCode == 307 {
-                loc := resp.Header.Get("Location")
-
-                req, err := http.NewRequest("GET", loc, nil)
-
-                if err != nil {
-                    log.Error(err)
-                }
-
-                resp, err1 := kclient.Do(req)
-
-                if err1 != nil {
-                    if strings.Contains(err1.Error(), "time") {
-                        permutatedQ.Put(pd)
-                        <-sem
-                        return
-                    }
-
-                    log.Error(err1)
-                    permutatedQ.Put(pd)
-                    <-sem
-                    return
-                }
-
-                defer resp.Body.Close()
-
-                if resp.StatusCode == 200 {
-                    log.Infof("\033[32m\033[1mPUBLIC\033[39m\033[0m %s (\033[33mhttp://%s.%s\033[39m)", loc, pd.Domain.Domain, pd.Domain.Suffix)
-                    fo.Write([]byte("PUBLIC: " + pd.Permutation + "\r"))
-                    cfg.Stats.IncRequests200()
-                    cfg.Stats.Add200Link(loc)
-                } else if resp.StatusCode == 403 {
-                    log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
-                    fo.Write([]byte("FORBIDDEN: " + pd.Permutation + "\r"))
-                    cfg.Stats.IncRequests403()
-                    cfg.Stats.Add403Link(pd.Permutation)
-                }
-            } else if resp.StatusCode == 403 {
-                log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
-                fo.Write([]byte("FORBIDDEN: " + pd.Permutation + "\r"))
-                cfg.Stats.IncRequests403()
-                cfg.Stats.Add403Link(pd.Permutation)
-            } else if resp.StatusCode == 404 {
-                log.Debugf("\033[31m\033[1mNOT FOUND\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix)
-                cfg.Stats.IncRequests404()
-                cfg.Stats.Add404Link(pd.Permutation)
-            } else if resp.StatusCode == 503 {
-                log.Infof("\033[34m\033[1mTOO FAST\033[39m\033[0m (added to queue to process later)")
-                permutatedQ.Put(pd)
-                cfg.Stats.IncRequests503()
-                cfg.Stats.Add503Link(pd.Permutation)
-            } else {
-                log.Infof("\033[34m\033[1mUNKNOWN\033[39m\033[0m http://%s (\033[33mhttp://%s.%s\033[39m) (%d)", pd.Permutation, pd.Domain.Domain, pd.Domain.Suffix, resp.StatusCode)
-            }
-
-            <-sem
-        }(dom[0].(PermutatedDomain))
-
-        if permutatedQ.Len() == 0 {
-            break
-        }
-    }
-    */
 
 
 

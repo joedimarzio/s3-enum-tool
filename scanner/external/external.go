@@ -94,12 +94,102 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
 
     }
 
-    time.Sleep(500 * time.Millisecond) //500 ///
+    time.Sleep(1000 * time.Millisecond) //500 ///
 
-    bucket, err := existingBucketsYo.Get(1)
-    if (err != nil) {}
-    log.Infof("BUCKET: " + bucket[0].(string))
+    //bucket, err := existingBucketsYo.Get(1)
+    //if (err != nil) {}
+    //log.Infof("BUCKET: " + bucket[0].(string))
 
+    /*
+    for {
+        log.Infof("loop")
+        bucket, err := existingBucketsYo.Get(1)
+        if (err != nil) {}
+        log.Infof("Existing bucket named: " + bucket[0].(string))
+
+        if (existingBucketsYo.Len() == 0) {
+            break
+        }
+    }
+    */
+
+    
+    for {
+        time.Sleep(500 * time.Millisecond)
+        bucket, err := existingBucketsYo.Get(1)
+        if (err != nil) {}
+        log.Infof("Existing bucket named: " + bucket[0].(string))
+        fullS3name := (bucket[0].(string) + ".s3.amazonaws.com")
+
+        req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
+        req.Host = fullS3name
+
+        resp, err1 := kclient.Do(req)
+
+        if err1 != nil {
+            log.Error(err1)
+        }
+        io.Copy(ioutil.Discard, resp.Body)
+        defer resp.Body.Close()
+
+        if resp.StatusCode == 200 {
+            log.Infof("\033[32m\033[1mPUBLIC\033[39m\033[0m http://%s", fullS3name)
+            fo.Write([]byte("PUBLIC: " + fullS3name + "\r"))
+            cfg.Stats.IncRequests200()
+            cfg.Stats.Add200Link(fullS3name)
+        } else if resp.StatusCode == 307 {
+            loc := resp.Header.Get("Location")
+
+            req, err := http.NewRequest("GET", loc, nil)
+
+            if err != nil {
+                log.Error(err)
+            }
+
+            resp, err1 := kclient.Do(req)
+
+            if err1 != nil {
+                log.Error(err1)
+            }
+
+            defer resp.Body.Close()
+
+            if resp.StatusCode == 200 {
+                log.Infof("\033[32m\033[1mPUBLIC\033[39m\033[0m %s", loc)
+                fo.Write([]byte("PUBLIC: " + fullS3name + "\r"))
+                cfg.Stats.IncRequests200()
+                cfg.Stats.Add200Link(loc)
+            } else if resp.StatusCode == 403 {
+                log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m http://%s", fullS3name)
+                fo.Write([]byte("FORBIDDEN: " + fullS3name + "\r"))
+                cfg.Stats.IncRequests403()
+                cfg.Stats.Add403Link(fullS3name)
+            }
+        } else if resp.StatusCode == 403 {
+            log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m http://%s", fullS3name)
+            fo.Write([]byte("FORBIDDEN: " + fullS3name + "\r"))
+            cfg.Stats.IncRequests403()
+            cfg.Stats.Add403Link(fullS3name)
+        } else if resp.StatusCode == 404 {
+            log.Debugf("\033[31m\033[1mNOT FOUND\033[39m\033[0m http://%s", fullS3name)
+            cfg.Stats.IncRequests404()
+            cfg.Stats.Add404Link(fullS3name)
+        } else if resp.StatusCode == 503 {
+            log.Infof("\033[34m\033[1mTOO FAST\033[39m\033[0m %s", fullS3name)
+            cfg.Stats.IncRequests503()
+            cfg.Stats.Add503Link(fullS3name)
+        } else {
+            log.Infof("\033[34m\033[1mUNKNOWN\033[39m\033[0m http://%s", fullS3name)
+        }
+
+        if (existingBucketsYo.Len() == 0) {
+            break
+        }
+    }
+}
+
+
+    /*
     for {
         sem <- 1
         dom, err := permutatedQ.Get(1)
@@ -208,7 +298,8 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
             break
         }
     }
-}
+    */
+
 
 
 

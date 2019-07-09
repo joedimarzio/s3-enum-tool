@@ -62,157 +62,23 @@ func BucketExists(config aws.Config, bucket string) (bool) {
             switch aerr.Code() {
             case "AccessDenied":
                 existingBucketsYo.Put(bucket)
-                //<-sem
+                <-sem
                 return true
             default:
-                //<-sem
+                <-sem
                 return false
             }
         }
     } else {
         existingBucketsYo.Put(bucket)
-        //<-sem
+        <-sem
         return true
     }
-    //<-sem
+    <-sem
     return false
 }
 
 
-
-func ExistingBuckets(config aws.Config, buckets []string) {
-        //var max = 1
-        //sem = make(chan int, max)
-
-        for bucket := range buckets {
-            log.Infof(buckets[bucket])
-            BucketExists(config, buckets[bucket]) //go
-        }
-
-}
-
-
-func GetBucketNames(urls []string) []string {
-    bucketNames := []string{}
-
-    for url := range urls {
-        urlArr := strings.Split(urls[url], ".")
-        bucketName := urlArr[0]
-        bucketNames = append(bucketNames, bucketName)
-    }
-
-    return bucketNames
-}
-
-
-
-func PermutateDomain(domain, suffix, cfgPermutationsFile string) []string {
-    if _, err := os.Stat(cfgPermutationsFile); err != nil {
-        log.Fatal(err)
-    }
-
-    jsondata, err := ioutil.ReadFile(cfgPermutationsFile)
-
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    data := map[string]interface{}{}
-    dec := json.NewDecoder(strings.NewReader(string(jsondata)))
-    dec.Decode(&data)
-    jq := jsonq.NewQuery(data)
-
-    s3url, err := jq.String("s3_url")
-
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    var permutations []string
-
-    perms, err := jq.Array("permutations")
-
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Our list of permutations
-    for i := range perms {
-        permutations = append(permutations, fmt.Sprintf(perms[i].(string), domain, s3url))
-    }
-
-    // Permutations that are not easily put into the list
-    permutations = append(permutations, fmt.Sprintf("%s.%s.%s", domain, suffix, s3url))
-    permutations = append(permutations, fmt.Sprintf("%s.%s", strings.Replace(fmt.Sprintf("%s.%s", domain, suffix), ".", "", -1), s3url))
-
-    return permutations
-}
-
-
-
-// PermutateDomainRunner stores the dbQ results into the database
-func PermutateDomainRunner(cfg *cmd.Config) ([]string) {
-    var names []string
-
-    for i := range cfg.Domains {
-        if len(cfg.Domains[i]) != 0 {
-            punyCfgDomain, err := idna.ToASCII(cfg.Domains[i])
-            if err != nil {
-                log.Fatal(err)
-            }
-
-            if cfg.Domains[i] != punyCfgDomain {
-                log.Infof("Domain %s is %s (punycode)", cfg.Domains[i], punyCfgDomain)
-                log.Errorf("Internationalized domains cannot be S3 buckets (%s)", cfg.Domains[i])
-                continue
-            }
-
-            result := extract.Extract(punyCfgDomain)
-
-            if result.Root == "" || result.Tld == "" {
-                log.Errorf("%s is not a valid domain", punyCfgDomain)
-                continue
-            }
-
-            domainQ.Put(Domain{
-                CN:     punyCfgDomain,
-                Domain: result.Root,
-                Suffix: result.Tld,
-                Raw:    cfg.Domains[i],
-            })
-        }
-    }
-
-    if domainQ.Len() == 0 {
-        os.Exit(1)
-    }
-
-    for {
-        dstruct, err := domainQ.Get(1)
-
-        if err != nil {
-            log.Error(err)
-            continue
-        }
-
-        var d Domain = dstruct[0].(Domain)
-
-        log.Debugf("CN: %s\tDomain: %s.%s", d.CN, d.Domain, d.Suffix)
-
-        pd := PermutateDomain(d.Domain, d.Suffix, cfg.PermutationsFile)
-        for p := range pd {
-            permutatedQ.Put(PermutatedDomain{
-                Permutation: pd[p],
-                Domain:      d,
-            })
-        }
-
-        names = GetBucketNames(pd)
-        return names
-    }
-
-    //return names
-}
 
 
 
@@ -229,16 +95,17 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
         }
     }()
 
-    var max = 1
+    var max = 8
     sem = make(chan int, max)
 
+    for bucket := range buckets {
+        sem <- 1
+        log.Infof(buckets[bucket])
+        go BucketExists(config, buckets[bucket]) //go
 
-    if (len(bucketNames) < 5) {
-        log.Infof("ERROR")
     }
-    
-    ExistingBuckets(config, buckets) /////
-    
+
+    time.Sleep(500 * time.Millisecond) //500 ///
 
     existingBucketsYo.Put("asdf")
 
@@ -395,4 +262,128 @@ func Init(cfg *cmd.Config) {
             return http.ErrUseLastResponse
         },
     }
+}
+
+
+func GetBucketNames(urls []string) []string {
+    bucketNames := []string{}
+
+    for url := range urls {
+        urlArr := strings.Split(urls[url], ".")
+        bucketName := urlArr[0]
+        bucketNames = append(bucketNames, bucketName)
+    }
+
+    return bucketNames
+}
+
+
+
+
+func PermutateDomain(domain, suffix, cfgPermutationsFile string) []string {
+    if _, err := os.Stat(cfgPermutationsFile); err != nil {
+        log.Fatal(err)
+    }
+
+    jsondata, err := ioutil.ReadFile(cfgPermutationsFile)
+
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    data := map[string]interface{}{}
+    dec := json.NewDecoder(strings.NewReader(string(jsondata)))
+    dec.Decode(&data)
+    jq := jsonq.NewQuery(data)
+
+    s3url, err := jq.String("s3_url")
+
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    var permutations []string
+
+    perms, err := jq.Array("permutations")
+
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Our list of permutations
+    for i := range perms {
+        permutations = append(permutations, fmt.Sprintf(perms[i].(string), domain, s3url))
+    }
+
+    // Permutations that are not easily put into the list
+    permutations = append(permutations, fmt.Sprintf("%s.%s.%s", domain, suffix, s3url))
+    permutations = append(permutations, fmt.Sprintf("%s.%s", strings.Replace(fmt.Sprintf("%s.%s", domain, suffix), ".", "", -1), s3url))
+
+    return permutations
+}
+
+
+
+// PermutateDomainRunner stores the dbQ results into the database
+func PermutateDomainRunner(cfg *cmd.Config) ([]string) {
+    var names []string
+
+    for i := range cfg.Domains {
+        if len(cfg.Domains[i]) != 0 {
+            punyCfgDomain, err := idna.ToASCII(cfg.Domains[i])
+            if err != nil {
+                log.Fatal(err)
+            }
+
+            if cfg.Domains[i] != punyCfgDomain {
+                log.Infof("Domain %s is %s (punycode)", cfg.Domains[i], punyCfgDomain)
+                log.Errorf("Internationalized domains cannot be S3 buckets (%s)", cfg.Domains[i])
+                continue
+            }
+
+            result := extract.Extract(punyCfgDomain)
+
+            if result.Root == "" || result.Tld == "" {
+                log.Errorf("%s is not a valid domain", punyCfgDomain)
+                continue
+            }
+
+            domainQ.Put(Domain{
+                CN:     punyCfgDomain,
+                Domain: result.Root,
+                Suffix: result.Tld,
+                Raw:    cfg.Domains[i],
+            })
+        }
+    }
+
+    if domainQ.Len() == 0 {
+        os.Exit(1)
+    }
+
+    for {
+        dstruct, err := domainQ.Get(1)
+
+        if err != nil {
+            log.Error(err)
+            continue
+        }
+
+        var d Domain = dstruct[0].(Domain)
+
+        log.Debugf("CN: %s\tDomain: %s.%s", d.CN, d.Domain, d.Suffix)
+
+        pd := PermutateDomain(d.Domain, d.Suffix, cfg.PermutationsFile)
+        for p := range pd {
+            permutatedQ.Put(PermutatedDomain{
+                Permutation: pd[p],
+                Domain:      d,
+            })
+        }
+
+        names = GetBucketNames(pd)
+        return names
+    }
+
+    //return names
 }

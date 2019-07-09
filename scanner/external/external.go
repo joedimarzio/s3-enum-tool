@@ -80,20 +80,11 @@ func BucketExists(config aws.Config, bucket string) {
 
 // CheckDomainPermutations runs through all permutations checking them for PUBLIC/FORBIDDEN buckets
 func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []string) {
-    
-    //fo, err := os.Create("output.txt")
     if errorr != nil {
         panic(errorr)
     }
-    /*
-    defer func() {
-        if err := fo.Close(); err != nil {
-            panic(err)
-        }
-    }()
-    */
-
-    var max = 8
+    
+    var max = 16  //8 seems best so far
     sem = make(chan int, max)
 
     for bucket := range buckets {
@@ -105,23 +96,9 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
 
     time.Sleep(500 * time.Millisecond) //500 ///
 
-    existingBucketsYo.Put("asdf")
-
-    if (existingBucketsYo.Len() > 1) {
-        log.Infof("SUCCESS")
-    } else {
-        log.Infof("FAIL")
-    }
-
     bucket, err := existingBucketsYo.Get(1)
     if (err != nil) {}
-
     log.Infof("BUCKET: " + bucket[0].(string))
-
-    log.Infof("hi")
-
-
-
 
     for {
         sem <- 1
@@ -234,6 +211,8 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
 }
 
 
+
+
 // Init does low level initialization before we can run
 func Init(cfg *cmd.Config) {
     var err error
@@ -264,13 +243,14 @@ func Init(cfg *cmd.Config) {
 }
 
 
+
+
 func GetBucketNames(urls []string) []string {
     bucketNames := []string{}
 
     for url := range urls {
-        urlArr := strings.Split(urls[url], ".")
-        bucketName := urlArr[0]
-        bucketNames = append(bucketNames, bucketName)
+        fullName:=urls[url]
+        bucketNames = append(bucketNames, fullName[0:len(fullName)-17]) //remove .s3.amazonaws.com
     }
 
     return bucketNames
@@ -383,6 +363,4 @@ func PermutateDomainRunner(cfg *cmd.Config) ([]string) {
         names = GetBucketNames(pd)
         return names
     }
-
-    //return names
 }

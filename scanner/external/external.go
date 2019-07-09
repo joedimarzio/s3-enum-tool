@@ -1,19 +1,4 @@
-// slurp s3 bucket enumerator
-// Copyright (C) 2019 hehnope
-//
-// slurp is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// slurp is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Foobar. If not, see <http://www.gnu.org/licenses/>.
-//
+
 
 package external
 
@@ -71,6 +56,8 @@ var sem chan int
 var kclient *http.Client
 
 
+var existingBucketsYo queue.Queue
+
 
 
 func BucketExists(config aws.Config, bucket string) (bool) {
@@ -85,14 +72,22 @@ func BucketExists(config aws.Config, bucket string) (bool) {
         if aerr, ok := err.(awserr.Error); ok {   ////NEED TO ADD CASE FOR EXPIRED CREDS
             switch aerr.Code() {
             case "AccessDenied":
+                //log.Infof("EXISTS")
+                existingBucketsYo.Put(bucket)
+                //<-sem
                 return true
             default:
+                //<-sem
                 return false
             }
         }
     } else {
+        //log.Infof("EXISTS")
+        existingBucketsYo.Put(bucket)
+        //<-sem
         return true
     }
+    //<-sem
     return false
 }
 
@@ -101,12 +96,22 @@ func BucketExists(config aws.Config, bucket string) (bool) {
 func ExistingBuckets(config aws.Config, buckets []string) ([]string) {
         existBuckets := []string{}
 
+        //var max = 1
+        //sem = make(chan int, max)
+
         for bucket := range buckets {
             log.Infof(buckets[bucket])
+            BucketExists(config, buckets[bucket]) //go
+            //bucketexist, err := existingBucketsYo.Get(1)
+
+            //if (err != nil) {}
+            //log.Infof(bucketexist[0].(string))
+            /*
             if BucketExists(config, buckets[bucket]) {
                 log.Infof("EXISTS: !!!!!!!!!!!! " + buckets[bucket])
                 existBuckets = append(existBuckets, buckets[bucket])
             }
+            */
         }
     
         return existBuckets
@@ -250,7 +255,7 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
         }
     }()
 
-    var max = cfg.Concurrency
+    var max = 1
     sem = make(chan int, max)
 
 
@@ -258,13 +263,23 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
         log.Infof("ERROR")
     }
     existingBucketNames := ExistingBuckets(config, buckets) /////
-
     if (existingBucketNames != nil) {
-        log.Infof("good")
     }
-    
+    //ExistingBuckets(config, buckets)
 
+    existingBucketsYo.Put("asdf")
 
+    if (existingBucketsYo.Len() > 1) {
+        log.Infof("SUCCESS")
+    } else {
+        log.Infof("FAIL")
+    }
+
+    bucket, err := existingBucketsYo.Get(1)
+
+    log.Infof("BUCKET: " + bucket[0].(string))
+
+    log.Infof("hi")
 
 
 

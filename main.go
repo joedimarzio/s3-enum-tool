@@ -40,11 +40,6 @@ func main() {
 
         log.Info("Building permutations....")
         bucketNames := external.PermutateDomainRunner(&cfg) //go
-        if (len(bucketNames) < 5) {
-            log.Infof("FFFFFFFFUUUUUUUU")
-        } else {
-            log.Infof("sweet")
-        }
 
         log.Info("Processing permutations....")
         external.CheckDomainPermutations(&cfg, config, bucketNames)

@@ -82,7 +82,7 @@ func BucketExists(config aws.Config, bucket string) (bool) {
     if (result != nil) {
     }
     if err != nil {
-        if aerr, ok := err.(awserr.Error); ok {
+        if aerr, ok := err.(awserr.Error); ok {   ////NEED TO ADD CASE FOR EXPIRED CREDS
             switch aerr.Code() {
             case "AccessDenied":
                 return true
@@ -118,7 +118,7 @@ func GetBucketNames(urls []string) []string {
 
     for url := range urls {
         urlArr := strings.Split(urls[url], ".")
-        bucketName := urlArr[0] + urlArr[1]
+        bucketName := urlArr[0]
         bucketNames = append(bucketNames, bucketName)
     }
 

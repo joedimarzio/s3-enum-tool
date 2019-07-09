@@ -47,53 +47,51 @@ var sem chan int
 var kclient *http.Client
 var existingBucketsYo queue.Queue
 
+var fo, errorr = os.Create("output.txt")
 
 
-func BucketExists(config aws.Config, bucket string) (bool) {
+func BucketExists(config aws.Config, bucket string) {
     svc := s3.New(session.New(), &config)
     input := &s3.GetBucketLocationInput{}
     input.Bucket = aws.String(bucket)
 
     result, err := svc.GetBucketLocation(input)
-    if (result != nil) {
-    }
+    if (result != nil) {}
     if err != nil {
         if aerr, ok := err.(awserr.Error); ok {   ////NEED TO ADD CASE FOR EXPIRED CREDS
             switch aerr.Code() {
             case "AccessDenied":
+                fo.Write([]byte("Bucket exists: " + bucket + "\r"))
                 existingBucketsYo.Put(bucket)
-                <-sem
-                return true
             default:
-                <-sem
-                return false
             }
         }
     } else {
+        fo.Write([]byte("Bucket exists: " + bucket + "\r"))
         existingBucketsYo.Put(bucket)
-        <-sem
-        return true
     }
+
     <-sem
-    return false
+    return
 }
-
-
 
 
 
 
 // CheckDomainPermutations runs through all permutations checking them for PUBLIC/FORBIDDEN buckets
 func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []string) {
-    fo, err := os.Create("output.txt")
-    if err != nil {
-        panic(err)
+    
+    //fo, err := os.Create("output.txt")
+    if errorr != nil {
+        panic(errorr)
     }
+    /*
     defer func() {
         if err := fo.Close(); err != nil {
             panic(err)
         }
     }()
+    */
 
     var max = 8
     sem = make(chan int, max)
@@ -116,6 +114,7 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
     }
 
     bucket, err := existingBucketsYo.Get(1)
+    if (err != nil) {}
 
     log.Infof("BUCKET: " + bucket[0].(string))
 

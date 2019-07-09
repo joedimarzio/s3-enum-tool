@@ -34,6 +34,11 @@ import (
     "github.com/jmoiron/jsonq"
     "github.com/Workiva/go-datastructures/queue"
 
+    "github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/service/s3"
+    "github.com/aws/aws-sdk-go/aws/awserr"
+    "github.com/aws/aws-sdk-go/aws/session"
+
     log "github.com/sirupsen/logrus"
 )
 
@@ -57,13 +62,71 @@ type PermutatedDomain struct {
     Domain      Domain
 }
 
+
 var domainQ *queue.Queue
 var permutatedQ *queue.Queue
+var bucketNames []string //*queue.Queue
 var extract *tldextract.TLDExtract
 var sem chan int
 var kclient *http.Client
 
-// PermutateDomain returns all possible domain permutations
+
+
+
+func BucketExists(config aws.Config, bucket string) (bool) {
+    svc := s3.New(session.New(), &config)
+    input := &s3.GetBucketLocationInput{}
+    input.Bucket = aws.String(bucket)
+
+    result, err := svc.GetBucketLocation(input)
+    if (result != nil) {
+    }
+    if err != nil {
+        if aerr, ok := err.(awserr.Error); ok {
+            switch aerr.Code() {
+            case "AccessDenied":
+                return true
+            default:
+                return false
+            }
+        }
+    } else {
+        return true
+    }
+    return false
+}
+
+
+
+func ExistingBuckets(config aws.Config, buckets []string) ([]string) {
+        existBuckets := []string{}
+
+        for bucket := range buckets {
+            log.Infof(buckets[bucket])
+            if BucketExists(config, buckets[bucket]) {
+                log.Infof("EXISTS: !!!!!!!!!!!! " + buckets[bucket])
+                existBuckets = append(existBuckets, buckets[bucket])
+            }
+        }
+    
+        return existBuckets
+}
+
+
+func GetBucketNames(urls []string) []string {
+    bucketNames := []string{}
+
+    for url := range urls {
+        urlArr := strings.Split(urls[url], ".")
+        bucketName := urlArr[0] + urlArr[1]
+        bucketNames = append(bucketNames, bucketName)
+    }
+
+    return bucketNames
+}
+
+
+
 func PermutateDomain(domain, suffix, cfgPermutationsFile string) []string {
     if _, err := os.Stat(cfgPermutationsFile); err != nil {
         log.Fatal(err)
@@ -106,47 +169,12 @@ func PermutateDomain(domain, suffix, cfgPermutationsFile string) []string {
     return permutations
 }
 
-// PermutateKeyword returns all possible keyword permutations
-func PermutateKeyword(keyword, cfgPermutationsFile string) []string {
-    if _, err := os.Stat(cfgPermutationsFile); err != nil {
-        log.Fatal(err)
-    }
 
-    jsondata, err := ioutil.ReadFile(cfgPermutationsFile)
-
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    data := map[string]interface{}{}
-    dec := json.NewDecoder(strings.NewReader(string(jsondata)))
-    dec.Decode(&data)
-    jq := jsonq.NewQuery(data)
-
-    s3url, err := jq.String("s3_url")
-
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    var permutations []string
-
-    perms, err := jq.Array("permutations")
-
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Our list of permutations
-    for i := range perms {
-        permutations = append(permutations, fmt.Sprintf(perms[i].(string), keyword, s3url))
-    }
-
-    return permutations
-}
 
 // PermutateDomainRunner stores the dbQ results into the database
-func PermutateDomainRunner(cfg *cmd.Config) {
+func PermutateDomainRunner(cfg *cmd.Config) ([]string) {
+    var names []string
+
     for i := range cfg.Domains {
         if len(cfg.Domains[i]) != 0 {
             punyCfgDomain, err := idna.ToASCII(cfg.Domains[i])
@@ -193,32 +221,25 @@ func PermutateDomainRunner(cfg *cmd.Config) {
         log.Debugf("CN: %s\tDomain: %s.%s", d.CN, d.Domain, d.Suffix)
 
         pd := PermutateDomain(d.Domain, d.Suffix, cfg.PermutationsFile)
-
         for p := range pd {
             permutatedQ.Put(PermutatedDomain{
                 Permutation: pd[p],
                 Domain:      d,
             })
         }
+
+        names = GetBucketNames(pd)
+        return names
     }
+
+    //return names
 }
 
-// PermutateKeywordRunner stores the dbQ results into the database
-func PermutateKeywordRunner(cfg *cmd.Config) {
-    for keyword := range cfg.Keywords {
-        pd := PermutateKeyword(cfg.Keywords[keyword], cfg.PermutationsFile)
 
-        for p := range pd {
-            permutatedQ.Put(Keyword{
-                Keyword:     cfg.Keywords[keyword],
-                Permutation: pd[p],
-            })
-        }
-    }
-}
+
 
 // CheckDomainPermutations runs through all permutations checking them for PUBLIC/FORBIDDEN buckets
-func CheckDomainPermutations(cfg *cmd.Config) {
+func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []string) {
     fo, err := os.Create("output.txt")
     if err != nil {
         panic(err)
@@ -232,6 +253,22 @@ func CheckDomainPermutations(cfg *cmd.Config) {
     var max = cfg.Concurrency
     sem = make(chan int, max)
 
+
+    if (len(bucketNames) < 5) {
+        log.Infof("ERROR")
+    }
+    existingBucketNames := ExistingBuckets(config, buckets) /////
+
+    if (existingBucketNames != nil) {
+        log.Infof("good")
+    }
+    
+
+
+
+
+
+
     for {
         sem <- 1
         dom, err := permutatedQ.Get(1)
@@ -241,7 +278,7 @@ func CheckDomainPermutations(cfg *cmd.Config) {
         }
 
         func(pd PermutatedDomain) {
-            time.Sleep(100 * time.Millisecond) //500
+            time.Sleep(200 * time.Millisecond) //500
             req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
 
             if err != nil {
@@ -342,132 +379,6 @@ func CheckDomainPermutations(cfg *cmd.Config) {
     }
 }
 
-// CheckKeywordPermutations runs through all permutations checking them for PUBLIC/FORBIDDEN buckets
-func CheckKeywordPermutations(cfg *cmd.Config) {
-    fo, err := os.Create("output.txt")
-    if err != nil {
-        panic(err)
-    }
-    // close fo on exit and check for its returned error
-    defer func() {
-        if err := fo.Close(); err != nil {
-            panic(err)
-        }
-    }()
-
-    var max = cfg.Concurrency
-    sem = make(chan int, max)
-
-    for {
-        sem <- 1
-        dom, err := permutatedQ.Get(1)
-
-        if err != nil {
-            log.Error(err)
-        }
-
-        func(pd Keyword) { //put go back in
-            time.Sleep(100 * time.Millisecond) //500
-            req, err := http.NewRequest("GET", "http://s3-1-w.amazonaws.com", nil)
-
-            if err != nil {
-                if !strings.Contains(err.Error(), "time") {
-                    log.Error(err)
-                }
-
-                permutatedQ.Put(pd)
-                <-sem
-                return
-            }
-
-            req.Host = pd.Permutation
-            //req.Header.Add("Host", host)
-
-            resp, err1 := kclient.Do(req)
-
-            if err1 != nil {
-                if strings.Contains(err1.Error(), "time") {
-                    permutatedQ.Put(pd)
-                    <-sem
-                    return
-                }
-
-                log.Error(err1)
-                permutatedQ.Put(pd)
-                <-sem
-                return
-            }
-            io.Copy(ioutil.Discard, resp.Body)
-            defer resp.Body.Close()
-
-            if resp.StatusCode == 200 {
-                log.Infof("\033[32m\033[1mPUBLIC\033[39m\033[0m http://%s (\033[33m%s\033[39m)", pd.Permutation, pd.Keyword)
-                fo.Write([]byte("PUBLIC: " + pd.Permutation + "\r"))
-                cfg.Stats.IncRequests200()
-                cfg.Stats.Add200Link(pd.Permutation)
-            } else if resp.StatusCode == 307 {
-                loc := resp.Header.Get("Location")
-
-                req, err := http.NewRequest("GET", loc, nil)
-
-                if err != nil {
-                    log.Error(err)
-                }
-
-                resp, err1 := kclient.Do(req)
-
-                if err1 != nil {
-                    if strings.Contains(err1.Error(), "time") {
-                        permutatedQ.Put(pd)
-                        <-sem
-                        return
-                    }
-
-                    log.Error(err1)
-                    permutatedQ.Put(pd)
-                    <-sem
-                    return
-                }
-
-                defer resp.Body.Close()
-
-                if resp.StatusCode == 200 {
-                    log.Infof("\033[32m\033[1mPUBLIC\033[39m\033[0m %s (\033[33m%s\033[39m)", loc, pd.Keyword)
-                    fo.Write([]byte("PUBLIC: " + pd.Permutation + "\r"))
-                    cfg.Stats.IncRequests200()
-                    cfg.Stats.Add200Link(loc)
-                } else if resp.StatusCode == 403 {
-                    log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m %s (\033[33m%s\033[39m)", loc, pd.Keyword)
-                    fo.Write([]byte("FORBIDDEN: " + pd.Permutation + "\r"))
-                    cfg.Stats.IncRequests403()
-                    cfg.Stats.Add403Link(loc)
-                }
-            } else if resp.StatusCode == 403 {
-                log.Infof("\033[33m\033[1mFORBIDDEN\033[39m\033[0m http://%s (\033[33m%s\033[39m)", pd.Permutation, pd.Keyword)
-                fo.Write([]byte("FORBIDDEN: " + pd.Permutation + "\r"))
-                cfg.Stats.IncRequests403()
-                cfg.Stats.Add403Link(pd.Permutation)
-            } else if resp.StatusCode == 404 {
-                log.Debugf("\033[31m\033[1mNOT FOUND\033[39m\033[0m http://%s (\033[33m%s\033[39m)", pd.Permutation, pd.Keyword)
-                cfg.Stats.IncRequests404()
-                cfg.Stats.Add404Link(pd.Permutation)
-            } else if resp.StatusCode == 503 {
-                log.Infof("\033[34m\033[1mTOO FAST\033[39m\033[0m (added to queue to process later)")
-                permutatedQ.Put(pd)
-                cfg.Stats.IncRequests503()
-                cfg.Stats.Add503Link(pd.Permutation)
-            } else {
-                log.Infof("\033[34m\033[1mUNKNOWN\033[39m\033[0m http://%s (\033[33m%s\033[39m) (%d)", pd.Permutation, pd.Keyword, resp.StatusCode)
-            }
-
-            <-sem
-        }(dom[0].(Keyword))
-
-        if permutatedQ.Len() == 0 {
-            break
-        }
-    }
-}
 
 // Init does low level initialization before we can run
 func Init(cfg *cmd.Config) {

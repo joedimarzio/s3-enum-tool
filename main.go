@@ -34,24 +34,20 @@ func main() {
 
     switch cfg.State {
     case "DOMAIN":
+        var config aws.Config
+        config.Region = &cfg.Region
         external.Init(&cfg)
 
         log.Info("Building permutations....")
-        go external.PermutateDomainRunner(&cfg)
+        bucketNames := external.PermutateDomainRunner(&cfg) //go
+        if (len(bucketNames) < 5) {
+            log.Infof("FFFFFFFFUUUUUUUU")
+        } else {
+            log.Infof("sweet")
+        }
 
         log.Info("Processing permutations....")
-        external.CheckDomainPermutations(&cfg)
-
-        // Print stats info
-        log.Printf("%+v", cfg.Stats)
-    case "KEYWORD":
-        external.Init(&cfg)
-
-        log.Info("Building permutations....")
-        go external.PermutateKeywordRunner(&cfg)
-
-        log.Info("Processing permutations....")
-        external.CheckKeywordPermutations(&cfg)
+        external.CheckDomainPermutations(&cfg, config, bucketNames)
 
         // Print stats info
         log.Printf("%+v", cfg.Stats)

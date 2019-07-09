@@ -11,19 +11,15 @@ import (
     "strings"
     "time"
     "net/http"
-
     "slurp/scanner/cmd"
-
     "github.com/joeguo/tldextract"
     "golang.org/x/net/idna"
     "github.com/jmoiron/jsonq"
     "github.com/Workiva/go-datastructures/queue"
-
     "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/service/s3"
     "github.com/aws/aws-sdk-go/aws/awserr"
     "github.com/aws/aws-sdk-go/aws/session"
-
     log "github.com/sirupsen/logrus"
 )
 
@@ -35,11 +31,6 @@ type Domain struct {
     Raw    string
 }
 
-// Keyword is used when `keyword` action is used
-type Keyword struct {
-    Permutation string
-    Keyword     string
-}
 
 // PermutatedDomain is a permutation of the domain
 type PermutatedDomain struct {
@@ -54,8 +45,6 @@ var bucketNames []string //*queue.Queue
 var extract *tldextract.TLDExtract
 var sem chan int
 var kclient *http.Client
-
-
 var existingBucketsYo queue.Queue
 
 
@@ -72,7 +61,6 @@ func BucketExists(config aws.Config, bucket string) (bool) {
         if aerr, ok := err.(awserr.Error); ok {   ////NEED TO ADD CASE FOR EXPIRED CREDS
             switch aerr.Code() {
             case "AccessDenied":
-                //log.Infof("EXISTS")
                 existingBucketsYo.Put(bucket)
                 //<-sem
                 return true
@@ -82,7 +70,6 @@ func BucketExists(config aws.Config, bucket string) (bool) {
             }
         }
     } else {
-        //log.Infof("EXISTS")
         existingBucketsYo.Put(bucket)
         //<-sem
         return true
@@ -93,28 +80,15 @@ func BucketExists(config aws.Config, bucket string) (bool) {
 
 
 
-func ExistingBuckets(config aws.Config, buckets []string) ([]string) {
-        existBuckets := []string{}
-
+func ExistingBuckets(config aws.Config, buckets []string) {
         //var max = 1
         //sem = make(chan int, max)
 
         for bucket := range buckets {
             log.Infof(buckets[bucket])
             BucketExists(config, buckets[bucket]) //go
-            //bucketexist, err := existingBucketsYo.Get(1)
-
-            //if (err != nil) {}
-            //log.Infof(bucketexist[0].(string))
-            /*
-            if BucketExists(config, buckets[bucket]) {
-                log.Infof("EXISTS: !!!!!!!!!!!! " + buckets[bucket])
-                existBuckets = append(existBuckets, buckets[bucket])
-            }
-            */
         }
-    
-        return existBuckets
+
 }
 
 
@@ -262,10 +236,9 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
     if (len(bucketNames) < 5) {
         log.Infof("ERROR")
     }
-    existingBucketNames := ExistingBuckets(config, buckets) /////
-    if (existingBucketNames != nil) {
-    }
-    //ExistingBuckets(config, buckets)
+    
+    ExistingBuckets(config, buckets) /////
+    
 
     existingBucketsYo.Put("asdf")
 

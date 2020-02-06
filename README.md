@@ -1,4 +1,4 @@
-# slurp
+# s3-enum-tool
 Blackbox/whitebox S3 bucket enumerator
 
 ## Overview
@@ -33,7 +33,7 @@ In this mode, you are using the AWS API **with credentials** on a specific accou
 ![internal-scan](./docs/internal.png)
 
 ## Usage
-- `slurp domain <-t|--target> example.com` will enumerate the S3 domains for a specific target.
+- `slurp domain <-t|--target> example.com` will enumerate the S3 domains for a specific target over the `permutations.json` file. Add the `-p /location/permutations-file.json` flag to specify a different permutations file.
 - `slurp keyword <-t|--target> linux,golang,python` will enumerate S3 buckets based on those 3 key words.
 - `slurp internal` performs an internal scan using the AWS API.
 

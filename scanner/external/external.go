@@ -102,6 +102,10 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
     
     for {
         time.Sleep(500 * time.Millisecond)
+        if (existingBucketsYo.Len() == 0) {
+            break
+        }
+
         bucket, err := existingBucketsYo.Get(1)
         if (err != nil) {}
         log.Infof("Existing bucket named: " + bucket[0].(string))
@@ -168,9 +172,6 @@ func CheckDomainPermutations(cfg *cmd.Config, config aws.Config, buckets []strin
             log.Infof("\033[34m\033[1mUNKNOWN\033[39m\033[0m http://%s", fullS3name)
         }
 
-        if (existingBucketsYo.Len() == 0) {
-            break
-        }
     }
 }
 
